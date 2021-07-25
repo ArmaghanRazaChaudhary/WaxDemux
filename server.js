@@ -4,7 +4,7 @@ var url = "mongodb://localhost:27017/data";
 var count = 0;
 var db;
 
-axios.get('https://wax.api.atomicassets.io/atomicassets/v1/accounts?collection_name=armiesxpower&schema_name=s1playables&limit=10000&page=1')
+axios.get('https://wax.api.atomicassets.io/atomicassets/v1/accounts?collection_name=armiesxpower&schema_name=s1playables&limit=500&page=1')
 .then(async function (response) {
   db = await  MongoClient.connect(url,{useNewUrlParser: true, useUnifiedTopology: true});
 
@@ -35,7 +35,7 @@ async function getAssets(element){
         var defense = response2.data.data[j].template.immutable_data['defense+'];
         var obj = {owner,asset_id,power,attack,defense}
         var dbo = await db.db("data");
-        await dbo.collection("assets").insertOne(obj)
+        await dbo.collection("assets").update({asset_id:asset_id},obj,upsert=true)
         console.log(owner,": ",count);
         count++;
     }
@@ -67,6 +67,9 @@ async function getSum(user){
   totalAssets = documents[0].count;
 
   var obj2 = {user,totalPower,totalAttack,totalDefense,totalAssets}
-  await dbo.collection("powers").insertOne(obj2)
 
+  var userData = await dbo.collection("powers").findOne({user:user})
+
+  if(userData.totalPower != totalPower || userData.totalAttack != totalAttack || userData.totalDefense != totalDefense || userData.totalAssets != totalAssets )
+    await dbo.collection("powers").update({user:user},obj2,upsert=true)
 }
