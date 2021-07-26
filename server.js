@@ -4,14 +4,16 @@ var url = "mongodb://localhost:27017/data";
 var count = 0;
 var db;
 
-axios.get('https://wax.api.atomicassets.io/atomicassets/v1/accounts?collection_name=armiesxpower&schema_name=s1playables&limit=500&page=1')
+axios.get('https://wax.api.atomicassets.io/atomicassets/v1/accounts?collection_name=armiesxpower&schema_name=s1playables&limit=200&page=1')
 .then(async function (response) {
   db = await  MongoClient.connect(url,{useNewUrlParser: true, useUnifiedTopology: true});
 
   for (let i = 0; i < response.data.data.length; i++) {
 
-    //await getAssets(response.data.data[i]);
-    await getSum(response.data.data[i].account);
+    flagReceieved = await getAssets(response.data.data[i]);
+
+    if(flagReceieved)
+      await getSum(response.data.data[i].account);
   }
 })
 .catch(function (error) {
@@ -21,13 +23,20 @@ axios.get('https://wax.api.atomicassets.io/atomicassets/v1/accounts?collection_n
 
 async function getAssets(element){
 
+  flag = false;
   var ceiledAssetNumber = Math.ceil(parseInt(element.assets/1000));
   for(i=1; i <= ceiledAssetNumber+1 ; i++){
+
+    console.log(element.account);
 
     response2 = await axios.get('https://wax.api.atomicassets.io/atomicassets/v1/assets?collection_name=armiesxpower&schema_name=s1playables&limit=1000&page='+i+'&owner='+(element.account).toString());
     console.log(response2.data.data.length)
     for ( j = 0; j < response2.data.data.length; j++) {
-  
+      
+
+      if(response2.data.data[j].template.immutable_data.type != "Enemy"){
+
+        flag = true;
         var owner = response2.data.data[j].owner;
         var asset_id = response2.data.data[j].asset_id;
         var power = response2.data.data[j].template.immutable_data['power+'];
@@ -35,11 +44,14 @@ async function getAssets(element){
         var defense = response2.data.data[j].template.immutable_data['defense+'];
         var obj = {owner,asset_id,power,attack,defense}
         var dbo = await db.db("data");
-        await dbo.collection("assets").update({asset_id:asset_id},obj,upsert=true)
+        await dbo.collection("assets").insertOne(obj)
         console.log(owner,": ",count);
         count++;
+      } 
     }
   }
+
+  return flag;
 }
 
 async function getSum(user){
@@ -70,6 +82,8 @@ async function getSum(user){
 
   var userData = await dbo.collection("powers").findOne({user:user})
 
-  if(userData.totalPower != totalPower || userData.totalAttack != totalAttack || userData.totalDefense != totalDefense || userData.totalAssets != totalAssets )
-    await dbo.collection("powers").update({user:user},obj2,upsert=true)
+  if(userData && ( userData.totalPower != totalPower || userData.totalAttack != totalAttack || userData.totalDefense != totalDefense || userData.totalAssets != totalAssets ))
+    await dbo.collection("powers").update({user:user},{$set:obj2},upsert=true);
+  else
+    await dbo.collection("powers").insertOne(obj2);
 }
