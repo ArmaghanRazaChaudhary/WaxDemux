@@ -17,46 +17,50 @@ setInterval(async function(){
 
     if(response.data.data.length > 0){
         console.log(response.data.data[0])
+        trans = await dbo.collection("transfers").findOne({transfer_id:response.data.data[0].transfer_id});
+        if(!trans){
+            await dbo.collection("transfers").insertOne({transfer_id:response.data.data[0].transfer_id});
+            for(i = 0; i < response.data.data.length; i++){
 
-        for(i = 0; i < response.data.data.length; i++){
-
-            var sender = await dbo.collection("powers").findOne({user:response.data.data[i].sender_name});
-            var recipient = await dbo.collection("powers").findOne({user:response.data.data[i].recipient_name});
-
-            console.log(response.data.data[i].sender_name)
-
-            if(sender){
-                console.log("In deduction Module")
-
-                for(j = 0; j < response.data.data[i].assets.length; j++){
-
-                    console.log(response.data.data[i].assets[j].template.immutable_data['power+'])
-                    if(response.data.data[i].assets[j].template.immutable_data['power+'])
-                        await dbo.collection("powers").updateOne( {user:response.data.data[i].sender_name},{ $inc: { totalPower: -1 * parseInt(response.data.data[i].assets[j].template.immutable_data['power+']) }},upsert=true);
-
-                }
-                
-                if(recipient){
-                    console.log("In Addition Module")
-
+                var sender = await dbo.collection("powers").findOne({user:response.data.data[i].sender_name});
+                var recipient = await dbo.collection("powers").findOne({user:response.data.data[i].recipient_name});
+    
+                console.log(response.data.data[i].sender_name)
+    
+                if(sender){
+                    console.log("In deduction Module")
+    
                     for(j = 0; j < response.data.data[i].assets.length; j++){
-
-                        console.log("loop")
-                        await updateAssetOwner(response.data.data[i].assets[j].asset_id,response.data.data[i].recipient_name);
-                        await dbo.collection("powers").updateOne( {user:response.data.data[i].recipient_name},{ $inc: { totalPower: parseInt(response.data.data[i].assets[j].template.immutable_data['power+']) }},upsert=true);
+    
+                        console.log(response.data.data[i].assets[j].template.immutable_data['power+'])
+                        if(response.data.data[i].assets[j].template.immutable_data['power+'])
+                            await dbo.collection("powers").updateOne( {user:response.data.data[i].sender_name},{ $inc: { totalPower: -1 * parseInt(response.data.data[i].assets[j].template.immutable_data['power+']) }},upsert=true);
+    
                     }
-                }
-                else{
-                    console.log("Blend happened")
-                    for(j = 0; j < response.data.data[i].assets.length; j++){
-                        await deleteAsset(response.data.data[i].assets[j].asset_id);
+                    
+                    if(recipient){
+                        console.log("In Addition Module")
+    
+                        for(j = 0; j < response.data.data[i].assets.length; j++){
+    
+                            console.log("loop")
+                            await updateAssetOwner(response.data.data[i].assets[j].asset_id,response.data.data[i].recipient_name);
+                            await dbo.collection("powers").updateOne( {user:response.data.data[i].recipient_name},{ $inc: { totalPower: parseInt(response.data.data[i].assets[j].template.immutable_data['power+']) }},upsert=true);
+                        }
                     }
-
-                    await insertAssetBlend(response.data.data[i].sender_name);
-
+                    else{
+                        console.log("Blend happened")
+                        for(j = 0; j < response.data.data[i].assets.length; j++){
+                            await deleteAsset(response.data.data[i].assets[j].asset_id);
+                        }
+    
+                        await insertAssetBlend(response.data.data[i].sender_name);
+    
+                    }
                 }
             }
         }
+        
     }
     else
         console.log("No Transfers in "+time)
